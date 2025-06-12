@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>나의 감정일기</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Nanum Pen Script', cursive; background: #fdfcf0; }
+    #startScreen, #cardScreen, #detailScreen { display: none; width: 100%; height: 100vh; justify-content: center; align-items: center; }
+    #startScreen {
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      background-color: #fdfcf0;
+    }
+    #startScreen .journal {
+      background: rgba(255,255,255,0.9); border: 2px solid #e0d5b8; border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1); padding: 40px; text-align: center;
+    }
+    #startScreen h1 { font-size: 3em; margin: 0 0 20px; color: #8b5e3c; }
+    #openBtn {
+      padding: 12px 32px; font-size: 1.2em; border: 2px solid #8b5e3c;
+      border-radius: 8px; background: #fdfcf0; color: #8b5e3c;
+      cursor: pointer; transition: background 0.3s;
+    }
+    #openBtn:hover { background: #f0eada; }
+    .grid-container {
+      display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(3, auto);
+      gap: 20px; opacity: 0; transform: translateY(30px);
+      transition: opacity 0.6s ease, transform 0.6s ease; padding: 20px;
+    }
+    .grid-container.show { opacity: 1; transform: translateY(0); }
+    .card {
+      background: linear-gradient(135deg,#fff 0%,#e6f7ff 100%); border:1px solid #cceeff;
+      border-radius:16px; box-shadow:0 4px 8px rgba(0,0,0,0.1);
+      display:flex; flex-direction:column; align-items:center; padding:20px;
+      cursor:pointer; transition:transform 0.3s ease;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .card:hover { transform:translateY(-5px); }
+    .emoji { font-size:48px; margin-bottom:10px; }
+    .label { font-weight:bold; color:#0050b3; }
+    /* 상세 화면 레이아웃 조정: 상단 정렬 및 패딩 조절 */
+    #detailScreen {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: flex-start; padding-top: 40px;
+    }
+    #detailScreen h1 {
+      font-size: 2em; color: #0050b3; margin-bottom: 10px;
+    }
+    #detailScreen #message {
+      font-size: 15pt;
+      margin: 5px 0; /* 상하 마진 조절 */
+      padding: 12px 20px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      color: #333;
+      max-width: 520px;
+      text-align: center;
+      min-height: 48px;
+    }
+    #detailScreen #history {
+      margin-top: 20px; width: 520px;
+      background: #fff; border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 16px; color: #333;
+      font-size: 20pt; line-height: 1.5;
+      text-align: left; max-height: 300px;
+      overflow-y: auto;
+    }
+    .log-date { display: flex; justify-content: space-between; align-items: center;
+      font-weight: bold; margin-top: 10px; margin-bottom: 4px; }
+    .entry { display: flex; justify-content: space-between; align-items: center;
+      margin-left: 16px; }
+    .delete-entry { background: #ff7875; margin-left: 8px; padding: 4px 8px; border-radius: 4px; font-size: 0.9em; }
+    .delete-entry:hover { background: #d9363e; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="startScreen">
+    <div class="journal">
+      <h1>나의 감정일기</h1>
+      <button id="openBtn">일기 열기</button>
+    </div>
+  </div>
+  <div id="cardScreen" style="display:none; flex-direction:column; align-items:center;">
+    <div id="cardsGrid" class="grid-container"></div>
+  </div>
+  <div id="detailScreen" style="display:none;">
+    <h1>오늘의 감정</h1>
+    <div id="message">감정을 선택해 주세요.</div>
+    <div id="history">
+      <strong>감정 일기:</strong>
+      <div id="historyContent">기록이 없습니다.</div>
+    </div>
+    <button id="backBtn" style="margin-top:20px;">뒤로가기</button>
+  </div>
+  <script>
+    const startScreen = document.getElementById('startScreen');
+    const cardScreen = document.getElementById('cardScreen');
+    const detailScreen = document.getElementById('detailScreen');
+    const openBtn = document.getElementById('openBtn');
+    const backBtn = document.getElementById('backBtn');
+    const cardsGrid = document.getElementById('cardsGrid');
+    const messageDiv = document.getElementById('message');
+    const historyContent = document.getElementById('historyContent');
+    const emotions = ['감사하다','기쁘다','놀라다','답답하다','무섭다','부끄럽다','불안하다','슬프다','신난다','짜증나다','행복하다','화나다'];
+    const emojis = ['🙏','😊','😲','😣','😱','😳','😟','😢','😆','😤','😄','😡'];
+    const responses = [
+      '그렇게 감사한 마음을 느끼다니, 따뜻하네요.',
+      '기쁜 소식을 듣는 건 정말 좋은 일이에요.',
+      '놀라셨군요. 다독여 드릴게요.',
+      '숨을 깊게 쉬어 보세요.',
+      '용기 내서 한 걸음씩 나아가요.',
+      '부끄러움을 인정하는 건 멋진 일이에요.',
+      '현재에 집중해 보세요.',
+      '울고 나면 마음이 가벼워져요.',
+      '즐거운 순간을 만끽하세요!',
+      '휴식이 필요할 수도 있어요.',
+      '행복한 기분 오래 유지하세요.',
+      '마음을 진정시키면 좋아요.'
+    ];
+    openBtn.addEventListener('click', () => {
+      startScreen.style.display = 'none';
+      cardScreen.style.display = 'flex';
+      renderCards();
+      loadLog();
+      setTimeout(() => cardsGrid.classList.add('show'), 100);
+    });
+    backBtn.addEventListener('click', () => {
+      detailScreen.style.display = 'none';
+      cardScreen.style.display = 'flex';
+      cardsGrid.classList.add('show');
+    });
+    function renderCards() {
+      cardsGrid.innerHTML = '';
+      emotions.forEach((label, i) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<div class="emoji">${emojis[i]}</div><div class="label">${label}</div>`;
+        card.addEventListener('click', () => selectEmotion(i));
+        cardsGrid.appendChild(card);
+      });
+    }
+    function selectEmotion(i) {
+      messageDiv.textContent = responses[i];
+      saveEmotion(emotions[i]);
+      cardScreen.style.display = 'none';
+      detailScreen.style.display = 'flex';
+      cardsGrid.classList.remove('show');
+      loadLog();
+    }
+    function loadLog() {
+      const log = JSON.parse(localStorage.getItem('emotionLog') || '{}');
+      historyContent.innerHTML = '';
+      const dates = Object.keys(log).sort((a, b) => new Date(b) - new Date(a));
+      if (!dates.length) {
+        historyContent.textContent = '기록이 없습니다.';
+        return;
+      }
+      dates.forEach(date => {
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'log-date';
+        dateDiv.textContent = date;
+        historyContent.appendChild(dateDiv);
+        log[date].forEach((entry, idx) => {
+          const entryDiv = document.createElement('div');
+          entryDiv.className = 'entry';
+          entryDiv.textContent = entry;
+          const delBtn = document.createElement('button');
+          delBtn.className = 'delete-entry';
+          delBtn.textContent = 'X';
+          delBtn.addEventListener('click', () => deleteEntry(date, idx));
+          entryDiv.appendChild(delBtn);
+          historyContent.appendChild(entryDiv);
+        });
+      });
+    }
+    function deleteEntry(date, idx) {
+      const log = JSON.parse(localStorage.getItem('emotionLog') || '{}');
+      if (log[date]) {
+        log[date].splice(idx, 1);
+        if (!log[date].length) delete log[date];
+        localStorage.setItem('emotionLog', JSON.stringify(log));
+        loadLog();
+      }
+    }
+    function saveEmotion(emotion) {
+      const now = new Date();
+      const date = now.toLocaleDateString('ko-KR');
+      const hours = now.getHours();
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const entry = `${hours}시 ${minutes}분 ${emotion}`;
+      const log = JSON.parse(localStorage.getItem('emotionLog') || '{}');
+      if (!log[date]) log[date] = [];
+      log[date].push(entry);
+      localStorage.setItem('emotionLog', JSON.stringify(log));
+    }
+  </script>
+</body>
+</html>
